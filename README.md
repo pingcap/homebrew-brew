@@ -1,2 +1,2 @@
 # homebrew-brew
-Homebrew taps for TiDB
+Homebrew formulas for TiDB
