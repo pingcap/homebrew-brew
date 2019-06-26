@@ -1,4 +1,4 @@
-class TidbServer < Formula
+class TidbServerAT20 < Formula
   desc "TiDB is a MySQL compatible distributed database"
   homepage "https://www.pingcap.com/en/"
   url "https://github.com/pingcap/tidb.git",
