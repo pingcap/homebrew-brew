@@ -1,9 +1,9 @@
-class TidbServer < Formula
+class TidbServerAT21 < Formula
   desc "TiDB is a MySQL compatible distributed database"
   homepage "https://www.pingcap.com/en/"
   url "https://github.com/pingcap/tidb.git",
-      :tag      => "v3.0.0-rc.3",
-      :revision => "07af45fc30278fa00e89b8ebf4ad6a6c536fbbfd"
+      :tag      => "v2.1.13",
+      :revision => "6b5b1a6802f9b8f5a22d8aab24ac80729331e1bc"
 
   depends_on "go" => :build
 
@@ -12,6 +12,10 @@ class TidbServer < Formula
     inreplace "config/config.go", "/tmp/tidb", var/"tidb"
     inreplace "tidb-server/main.go", "/tmp/tidb", var/"tidb"
 
+    # Removing the go.sum file
+    # fixes a problem in go mod hashes:
+    # https://stackoverflow.com/questions/54133789/go-modules-checksum-mismatch
+    rm "go.sum"
     system "make", "server"
     bin.install "bin/tidb-server"
   end
