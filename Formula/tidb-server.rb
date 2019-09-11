@@ -24,6 +24,9 @@ class TidbServer < Formula
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
       mysql -h 127.0.0.1 -P4000 -uroot
+
+      Questions? https://pingcap.com/tidbslack/
+
     EOS
     s
   end
