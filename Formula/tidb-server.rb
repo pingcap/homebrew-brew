@@ -2,8 +2,8 @@ class TidbServer < Formula
   desc "TiDB is a MySQL compatible distributed database"
   homepage "https://www.pingcap.com/en/"
   url "https://github.com/pingcap/tidb.git",
-      :tag      => "v3.0.7",
-      :revision => "84e4386c7a77d4b8df5db7f2303fb7fd3370eb9a"
+      :tag      => "v3.0.8",
+      :revision => "8f13cf1449bd8903ff465a4f12ed89ecbac858a4"
 
   depends_on "go" => :build
 
