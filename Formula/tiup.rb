@@ -1,26 +1,71 @@
 class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
-  homepage "https://www.pingcap.com/en/"
-  url "https://github.com/pingcap-incubator/tiup.git",
-    :tag => "v0.0.1"
+  homepage "https://www.pingcap.com"
+  url "https://tiup-mirrors.pingcap.com/install.sh"
+  sha256 "2784762fa6151539ecae3a975c21996036f4d7c82a4efe1f57dbefd1579c4b98"
+  license "Apache-2.0"
+  version "1.7.0"
 
-  depends_on "go" => :build
+  # depends_on "go" => :build
+  depends_on "curl" => :build
   depends_on "mysql-client" => :optional
 
   def install
-    system "make", "EXTRA_LDFLAGS=-X \"github.com/pingcap-incubator/tiup/pkg/localdata.DefaultTiupHome=#{var}/tiup\"", "cmd"
-    bin.install "bin/tiup"
+    # get current user
+    user = `whoami`
+    user.delete!("\n")
+    user.delete!("\r\n")
+
+    # home root path
+    root_ptah = if OS.mac?
+      "Users"
+    else
+      "/home"
+    end
+
+    home_path = root_ptah+"/"+user
+    # set real home path
+    if user == "root"
+      home_path = "/root"
+    end
+
+    # set HOME for tiup
+    ENV["HOME"] = home_path
+    #system "echo $HOME"
+
+    # cretae tiup home directory
+    tiup_home = home_path+"/"+".tiup"
+    # install
+    system "sh install.sh | grep -v 'shell' | grep -v 'profile' | grep -v 'playground' | grep -v '='"
+
+    # set tiup bin
+    bin_path = tiup_home+"/bin/tiup"
+    bin.install bin_path
+
+    #system "echo 'Installed path: ", tiup_home ,"'"
+  end
+
+  def upgrade
+    o = <<~EOS
+      Update all installed components to the latest version
+      ===============================================
+        Have a try:     tiup update --all
+      ===============================================
+
+      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
+
+    EOS
+    
   end
 
   def caveats
     s = <<~EOS
+      To get started running a full TiDB Platform stack, with TiDB Server, TiKV Server, and PD, use tiup playground:
+      ===============================================
+        Have a try:     tiup playground
+      ===============================================
 
-      To get started running a full TiDB Platform stack, with
-      TiDB Server, TiKV Server, and PD, use tiup playground:
-
-        tiup run playground
-
-      Questions? https://pingcap.com/tidbslack/
+      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
     EOS
     s
@@ -36,6 +81,6 @@ class Tiup < Formula
     #
     # The installed folder is not in the path, so use the entire path to any
     # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "false"
+    system "tiup" "--version"
   end
 end
