@@ -11,25 +11,7 @@ class Tiup < Formula
   depends_on "mysql-client" => :optional
 
   def install
-    # get current user
-    user = `whoami`
-    user.delete!("\n")
-    user.delete!("\r\n")
-
-    # home root path
-    root_ptah = if OS.mac?
-      "/Users"
-    else
-      "/home"
-    end
-
-    home_path = root_ptah+"/"+user
-    # set real home path
-    if user == "root"
-      home_path = "/root"
-    end
-
-    #tiup_home = home_path+"/"+".tiup"
+    # set tiup home
     tiup_home = ENV["HOME"]+"/"+".tiup"
 
     # install
@@ -47,6 +29,7 @@ class Tiup < Formula
     o = <<~EOS
 
       Update all installed components to the latest version
+      
       ===============================================
         Have a try:     tiup update --all
       ===============================================
@@ -60,15 +43,11 @@ class Tiup < Formula
   def caveats
     s = <<~EOS
       Install TiUP successfully!  Please run:
-      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
-      ===============================================
-        Must do: mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
-      ===============================================
+      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)\
 
-      To get started running a full TiDB Platform stack, with TiDB Server, TiKV Server, and PD, use tiup playground:
-      ===============================================
-        Have a try:     tiup playground
-      ===============================================
+      ======================================================================
+      ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
+      ======================================================================
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
