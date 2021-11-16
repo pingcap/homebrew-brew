@@ -36,7 +36,7 @@ class Tiup < Formula
     # cretae tiup home directory
     tiup_home = home_path+"/"+".tiup"
     # install
-    system "sh install.sh | grep -v 'shell' | grep -v 'profile' | grep -v 'playground' | grep -v '='"
+    system "sh install.sh"
 
     # set tiup bin
     bin_path = tiup_home+"/bin/tiup"
