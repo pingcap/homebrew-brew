@@ -18,7 +18,7 @@ class Tiup < Formula
 
     # home root path
     root_ptah = if OS.mac?
-      "Users"
+      "/Users"
     else
       "/home"
     end
@@ -29,24 +29,23 @@ class Tiup < Formula
       home_path = "/root"
     end
 
-    # set HOME for tiup
-    ENV["HOME"] = home_path
-    #system "echo $HOME"
+    #tiup_home = home_path+"/"+".tiup"
+    tiup_home = ENV["HOME"]+"/"+".tiup"
 
-    # cretae tiup home directory
-    tiup_home = home_path+"/"+".tiup"
     # install
     system "sh install.sh"
 
     # set tiup bin
     bin_path = tiup_home+"/bin/tiup"
+    #root_path = tiup_home+"/bin/root.json"
     bin.install bin_path
-
     #system "echo 'Installed path: ", tiup_home ,"'"
+    # end
   end
-
+  
   def upgrade
     o = <<~EOS
+
       Update all installed components to the latest version
       ===============================================
         Have a try:     tiup update --all
@@ -60,6 +59,12 @@ class Tiup < Formula
 
   def caveats
     s = <<~EOS
+      Install TiUP successfully!  Please run:
+      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
+      ===============================================
+        Must do: mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
+      ===============================================
+
       To get started running a full TiDB Platform stack, with TiDB Server, TiKV Server, and PD, use tiup playground:
       ===============================================
         Have a try:     tiup playground
