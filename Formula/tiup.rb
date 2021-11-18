@@ -24,21 +24,6 @@ class Tiup < Formula
     #system "echo 'Installed path: ", tiup_home ,"'"
     # end
   end
-  
-  def upgrade
-    o = <<~EOS
-
-      Update all installed components to the latest version
-      
-      ===============================================
-        Have a try:     tiup update --all
-      ===============================================
-
-      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
-
-    EOS
-    
-  end
 
   def caveats
     s = <<~EOS
