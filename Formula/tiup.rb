@@ -4,7 +4,7 @@ class Tiup < Formula
   url "https://tiup-mirrors.pingcap.com/install.sh"
   sha256 "2784762fa6151539ecae3a975c21996036f4d7c82a4efe1f57dbefd1579c4b98"
   license "Apache-2.0"
-  version "1.8.0"
+  version "1.8.1"
 
   # depends_on "go" => :build
   depends_on "curl" => :build
