@@ -42,7 +42,7 @@ class Tiup < Formula
       Update all installed components to the latest version
       
       ===============================================
-        Have a try:     tiup update --self && tiup update cluster
+        Have a try:     tiup update --all
       ===============================================
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
