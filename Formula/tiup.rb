@@ -2,10 +2,10 @@ class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.8.1",
-      revision: "559b99d0acb7d07acddbb8cda0304b0f27c6ec1e"
+      tag:      "v1.9.0",
+      revision: "18747cd26c1877c28281b13b51e0437056a14d28"
   license "Apache-2.0"
-  version "v1.8.1"
+  version "v1.9.0"
 
   depends_on "go" => :build
   # depends_on "curl" => :build
@@ -24,7 +24,7 @@ class Tiup < Formula
   def caveats
     s = <<~EOS
       Install TiUP successfully!  Please run:
-      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)\
+      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
       ======================================================================
       ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
