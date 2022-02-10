@@ -3,7 +3,7 @@ class Tiup < Formula
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
       tag:      "v1.9.0",
-      revision: "18747cd26c1877c28281b13b51e0437056a14d28"
+      revision: "382d0e95f1c68e2fe272266d77abd57f273f7f31"
   license "Apache-2.0"
   version "v1.9.0"
 
