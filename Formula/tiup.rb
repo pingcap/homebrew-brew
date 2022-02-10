@@ -1,41 +1,60 @@
 class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
-  homepage "https://www.pingcap.com/en/"
-  url "https://github.com/pingcap-incubator/tiup.git",
-    :tag => "v0.0.1"
+  homepage "https://www.pingcap.com"
+  url "https://github.com/pingcap/tiup.git",
+      tag:      "v1.9.0",
+      revision: "382d0e95f1c68e2fe272266d77abd57f273f7f31"
+  license "Apache-2.0"
+  version "v1.9.0"
 
   depends_on "go" => :build
+  # depends_on "curl" => :build
   depends_on "mysql-client" => :optional
 
   def install
-    system "make", "EXTRA_LDFLAGS=-X \"github.com/pingcap-incubator/tiup/pkg/localdata.DefaultTiupHome=#{var}/tiup\"", "cmd"
-    bin.install "bin/tiup"
+    # install
+    system "make", "tiup"
+    # set tiup bin
+    bin_path = "bin/tiup"
+    bin.install bin_path
+ 
+    # end
   end
 
   def caveats
     s = <<~EOS
+      Install TiUP successfully!  Please run:
+      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
-      To get started running a full TiDB Platform stack, with
-      TiDB Server, TiKV Server, and PD, use tiup playground:
+      ======================================================================
+      ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
+      ======================================================================
 
-        tiup run playground
-
-      Questions? https://pingcap.com/tidbslack/
+      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
     EOS
     s
   end
 
+  def upgrade
+    o = <<~EOS
+
+      Update all installed components to the latest version
+      
+      ===============================================
+        Have a try:     tiup update --all
+      ===============================================
+
+      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
+
+    EOS
+    
+  end
+
+
   test do
-    # `test do` will create, run in and delete a temporary directory.
-    #
-    # This test will fail and we won't accept that! For Homebrew/homebrew-core
-    # this will need to be a test that verifies the functionality of the
-    # software. Run the test with `brew test tiup`. Options passed
-    # to `brew install` such as `--HEAD` also need to be provided to `brew test`.
-    #
     # The installed folder is not in the path, so use the entire path to any
     # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "false"
+    system "#{bin}/tiup" "--version"
   end
 end
