@@ -26,9 +26,9 @@ class Tiup < Formula
       Install TiUP successfully!  Please run:
       (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
-      ======================================================================
+      ================================================================================================================
       ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
-      ======================================================================
+      ================================================================================================================
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
