@@ -5,7 +5,7 @@ class Tiup < Formula
       tag:      "v1.9.1",
       revision: "8c9d75df55c48e3cd645c2eea1fb0c51cfcd92d0"
   license "Apache-2.0"
-  version "v1.9.0"
+  version "v1.9.1"
 
   depends_on "go" => :build
   # depends_on "curl" => :build
