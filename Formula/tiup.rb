@@ -2,8 +2,8 @@ class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.9.1",
-      revision: "8c9d75df55c48e3cd645c2eea1fb0c51cfcd92d0"
+      tag:      "v1.9.3",
+      revision: "a6aeee2a19ca1c802e3151709bf85edd6c65b356"
   license "Apache-2.0"
   version "v1.9.1"
 
@@ -26,9 +26,9 @@ class Tiup < Formula
       Install TiUP successfully!  Please run:
       (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
-      ======================================================================
+      ================================================================================================================
       ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
-      ======================================================================
+      ================================================================================================================
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
