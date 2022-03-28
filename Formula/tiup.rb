@@ -4,7 +4,7 @@ class Tiup < Formula
   url "https://github.com/pingcap/tiup.git",
       tag:      "v1.9.3"
   license "Apache-2.0"
-  version "v1.9.1"
+  version "v1.9.3"
 
   depends_on "go" => :build
   # depends_on "curl" => :build
