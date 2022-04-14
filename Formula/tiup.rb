@@ -2,9 +2,9 @@ class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.9.4"
+      tag:      "v1.9.3"
   license "Apache-2.0"
-  version "v1.9.4"
+  version "v1.9.3"
 
   depends_on "go" => :build
   # depends_on "curl" => :build
@@ -54,6 +54,6 @@ class Tiup < Formula
   test do
     # The installed folder is not in the path, so use the entire path to any
     # executables being tested: `system "#{bin}/program", "do", "something"`.
-    system "#{bin}/tiup" "--version"
+    system "#{bin}/tiup" "-v"
   end
 end
