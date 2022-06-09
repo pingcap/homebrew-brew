@@ -2,9 +2,9 @@ class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.10.0"
+      tag:      "v1.10.1"
   license "Apache-2.0"
-  version "v1.10.0"
+  version "v1.10.1"
 
   depends_on "go" => :build
   # depends_on "curl" => :build
