@@ -28,12 +28,36 @@ class TidbServerAT21 < Formula
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
       mysql -h 127.0.0.1 -P4000 -uroot
+
+      Security notice:
+      The service binds the MySQL protocol listener to 127.0.0.1:4000 only.
+
+      TiDB 2.1 has no --status-host flag: its status/metrics HTTP service always
+      listens on every interface (:10080), so this formula disables that service
+      with --report-status=false. TiDB also bootstraps a single all-privileged
+      account, 'root'@'%', with an empty password, so anyone with local access
+      to this machine can read and change any data as root. Set a root password
+      and give applications a least-privileged account:
+
+        mysql -h 127.0.0.1 -P4000 -uroot
+        SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
+        CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-app-password';
+        GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
+
+      Running `tidb-server` by hand without --host 127.0.0.1 makes it listen on
+      every interface. To reach TiDB from another machine, prefer an SSH tunnel
+      (ssh -L 4000:127.0.0.1:4000 this-host) over rebinding to 0.0.0.0.
     EOS
     s
   end
 
-  plist_options :manual => "tidb-server"
+  plist_options :manual => "tidb-server --host 127.0.0.1 --report-status=false"
 
+  # TiDB defaults --host to 0.0.0.0, which would publish a passwordless,
+  # all-privileged 'root' account to the local network. 2.1 also has no
+  # --status-host flag, so its unauthenticated status/metrics/pprof HTTP service
+  # cannot be pinned to loopback and is disabled here instead of left on
+  # 0.0.0.0:10080.
   def plist
     s = <<~EOS
       <?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +71,9 @@ class TidbServerAT21 < Formula
         <key>ProgramArguments</key>
         <array>
           <string>#{opt_bin}/tidb-server</string>
+          <string>--host</string>
+          <string>127.0.0.1</string>
+          <string>--report-status=false</string>
         </array>
         <key>RunAtLoad</key>
         <true/>
@@ -61,7 +88,10 @@ class TidbServerAT21 < Formula
       dir = Dir.mktmpdir
 
       pid = fork do
-        exec bin/"tidb-server -path #{dir} -P 3999"
+        # Bind to loopback and skip the status HTTP service so `brew test` never
+        # publishes the server or collides with a running instance on :10080.
+        exec bin/"tidb-server", "--host", "127.0.0.1", "--report-status=false",
+             "-P", "3999", "-path", dir
       end
       sleep 2
 
