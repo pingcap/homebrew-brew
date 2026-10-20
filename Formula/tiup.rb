@@ -10,14 +10,26 @@ class Tiup < Formula
   # depends_on "curl" => :build
   depends_on "mysql-client" => :optional
 
+  # TiUP bootstraps its TUF trust from this root manifest. Fetching it with curl
+  # on first run is trust-on-first-use, so pin the immutable, versioned root
+  # published by the mirror and verify its SHA-256 at build time instead.
+  resource "tiup-root-json" do
+    url "https://tiup-mirrors.pingcap.com/2.root.json"
+    sha256 "032201888f247db943a3ab5b84ecb5e6dbd1d77c6b9adc9657b01175cdb534bf"
+  end
+
   def install
     # install
     system "make", "tiup"
     # set tiup bin
     bin_path = "bin/tiup"
     bin.install bin_path
- 
-    # end
+
+    # Provide the hash-verified TUF root so no unverified first-run download is
+    # needed.
+    resource("tiup-root-json").stage do
+      pkgshare.install "2.root.json" => "root.json"
+    end
   end
 
   def caveats
@@ -25,8 +37,11 @@ class Tiup < Formula
       Install TiUP successfully!  Please run:
       (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
+      TiUP needs a TUF root manifest before it can use the mirror. This formula
+      installs a pinned, SHA-256 verified copy, so do not fetch a fresh one:
+
       ================================================================================================================
-      ! Must do:      mkdir -p ~/.tiup/bin && curl https://tiup-mirrors.pingcap.com/root.json -o ~/.tiup/bin/root.json
+      ! Must do:      mkdir -p ~/.tiup/bin && cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
       ================================================================================================================
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management

@@ -23,61 +23,32 @@ class TidbServer < Formula
 
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
-      mysql -h 127.0.0.1 -P4000 -uroot
 
       Security notice:
-      The service binds both listeners to 127.0.0.1 only:
-        MySQL protocol       127.0.0.1:4000
-        Status/metrics HTTP  127.0.0.1:10080 (/metrics, /settings, /debug/pprof)
+      This formula deliberately installs no launchd service. TiDB bootstraps a
+      single all-privileged 'root'@'%' account with an empty password and has no
+      option to set one non-interactively, so an auto-starting, login-persistent
+      service would expose that account at every login. Start TiDB yourself,
+      bound to loopback with the unauthenticated status HTTP service disabled:
 
-      TiDB bootstraps a single all-privileged account, 'root'@'%', with an empty
-      password, and its status HTTP endpoints are unauthenticated. Anyone with
-      local access to this machine can read and change any data as root. Set a
-      root password and give applications a least-privileged account:
+        tidb-server --host 127.0.0.1 --report-status=false
+
+      In another terminal, set a root password, move root off the wildcard host,
+      and create a least-privileged account for applications:
 
         mysql -h 127.0.0.1 -P4000 -uroot
         SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
+        CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-root-password';
         CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-app-password';
         GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
+        DROP USER 'root'@'%';
 
-      Running `tidb-server` by hand without --host 127.0.0.1 makes it listen on
-      every interface. To reach TiDB from another machine, prefer an SSH tunnel
-      (ssh -L 4000:127.0.0.1:4000 this-host) over rebinding to 0.0.0.0.
+      Dropping 'root'@'%' leaves root reachable only from loopback. If you must
+      reach TiDB from another machine, prefer an SSH tunnel
+      (ssh -L 4000:127.0.0.1:4000 this-host) over binding to 0.0.0.0.
 
       Questions? https://pingcap.com/tidbslack/
 
-    EOS
-    s
-  end
-
-  plist_options :manual => "tidb-server --host 127.0.0.1 --status-host 127.0.0.1"
-
-  # TiDB defaults both --host and --status-host to 0.0.0.0, which would publish
-  # a passwordless, all-privileged 'root' account and an unauthenticated
-  # status/metrics/pprof HTTP endpoint to the local network. Pin them to
-  # loopback here so `brew services start tidb-server` is safe by default.
-  def plist
-    s = <<~EOS
-      <?xml version="1.0" encoding="UTF-8"?>
-      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-      <plist version="1.0">
-      <dict>
-        <key>KeepAlive</key>
-        <true/>
-        <key>Label</key>
-        <string>#{plist_name}</string>
-        <key>ProgramArguments</key>
-        <array>
-          <string>#{opt_bin}/tidb-server</string>
-          <string>--host</string>
-          <string>127.0.0.1</string>
-          <string>--status-host</string>
-          <string>127.0.0.1</string>
-        </array>
-        <key>RunAtLoad</key>
-        <true/>
-      </dict>
-      </plist>
     EOS
     s
   end
