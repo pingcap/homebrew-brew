@@ -15,17 +15,20 @@ class TidbServer < Formula
   depends_on "go" => :build
 
   def install
-    # Keep the data directory under Homebrew's var; the built-in socket default
-    # is left untouched because the service and the caveats pass --socket.
+    # Keep data and the default socket under Homebrew's var; the socket default
+    # matters for manual runs that do not pass --socket.
     inreplace "pkg/config/config.go" do |s|
-      unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb\"")
-        raise "could not rewrite the default data path in pkg/config/config.go"
+      unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb-26\"") &&
+             s.gsub!('"/tmp/tidb-{Port}.sock"', "\"#{var}/tidb.sock\"")
+        raise "could not rewrite the default data or socket path in pkg/config/config.go"
       end
     end
     inreplace "cmd/tidb-server/main.go" do |s|
       unless s.gsub!('storePath = fset.String(nmStorePath, "/tmp/tidb",',
-                     "storePath = fset.String(nmStorePath, \"#{var}/tidb\",")
-        raise "could not rewrite the default data path in cmd/tidb-server/main.go"
+                     "storePath = fset.String(nmStorePath, \"#{var}/tidb-26\",") &&
+             s.gsub!('socket = fset.String(nmSocket, "/tmp/tidb-{Port}.sock"',
+                     "socket = fset.String(nmSocket, \"#{var}/tidb.sock\"")
+        raise "could not rewrite the default data or socket path in cmd/tidb-server/main.go"
       end
     end
 
@@ -37,10 +40,9 @@ class TidbServer < Formula
     return unless (var/"tidb").exist?
 
     opoo <<~EOS
-      An existing TiDB datastore was found in #{var}/tidb and is not
-      re-bootstrapped. If it predates --initialize-secure it may still contain a
-      passwordless 'root'@'%'; see `brew info tidb-server` for the SQL that
-      removes it.
+      A datastore from an older formula was found at #{var}/tidb. This version
+      uses #{var}/tidb-26 and never opens the old store, so its accounts are not
+      reachable; see `brew info tidb-server` if you want to migrate it.
     EOS
   end
 
@@ -60,10 +62,11 @@ class TidbServer < Formula
 
         mysql -S #{var}/tidb.sock -uroot
 
-      An existing datastore is NOT re-bootstrapped. If it was created before
-      this formula, or without --initialize-secure, it may still contain a
-      passwordless 'root'@'%'. Remove it with (the GRANT keeps the replacement
-      administrative):
+      Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an older
+      formula is never opened by this service, so its accounts are not
+      reachable. To migrate that store deliberately, start tidb-server with
+      --path #{var}/tidb and drop its wildcard root (the GRANT keeps the
+      replacement administrative):
 
         mysql -S #{var}/tidb.sock -uroot
         SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
