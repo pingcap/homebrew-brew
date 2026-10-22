@@ -15,8 +15,8 @@ class TidbServer < Formula
   depends_on "go" => :build
 
   def install
-    # Keep the data directory under Homebrew's var; the socket template stays in
-    # /tmp so auth_socket logins keep working.
+    # Keep the data directory under Homebrew's var; the built-in socket default
+    # is left untouched because the service and the caveats pass --socket.
     inreplace "pkg/config/config.go" do |s|
       unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb\"")
         raise "could not rewrite the default data path in pkg/config/config.go"
@@ -33,6 +33,17 @@ class TidbServer < Formula
     bin.install "bin/tidb-server"
   end
 
+  def post_install
+    return unless (var/"tidb").exist?
+
+    opoo <<~EOS
+      An existing TiDB datastore was found in #{var}/tidb and is not
+      re-bootstrapped. If it predates --initialize-secure it may still contain a
+      passwordless 'root'@'%'; see `brew info tidb-server` for the SQL that
+      removes it.
+    EOS
+  end
+
   def caveats
     s = <<~EOS
       This install of TiDB uses the built-in unistore engine instead of TiKV,
@@ -42,19 +53,19 @@ class TidbServer < Formula
       brew install mysql-client
 
       Security notice:
-      `brew services start tidb-server` runs with --initialize-secure, so a fresh
-      datastore bootstraps 'root'@'localhost' with the auth_socket plugin: no
-      password, usable only over the Unix socket, and only by the OS user that
-      started the server. There is no wildcard root, and the unauthenticated
-      status HTTP service is disabled.
+      A fresh datastore is bootstrapped securely: 'root'@'localhost' uses the
+      auth_socket plugin, so it has no password, only works over the Unix socket
+      below, and only for the OS user that started the server. There is no
+      wildcard root, and the unauthenticated status HTTP service is disabled.
 
-        mysql -S /tmp/tidb-4000.sock -uroot
+        mysql -S #{var}/tidb.sock -uroot
 
-      A datastore created by an older formula was bootstrapped insecurely and is
-      not migrated automatically. For those, drop the wildcard root (the GRANT
-      keeps the replacement administrative):
+      An existing datastore is NOT re-bootstrapped. If it was created before
+      this formula, or without --initialize-secure, it may still contain a
+      passwordless 'root'@'%'. Remove it with (the GRANT keeps the replacement
+      administrative):
 
-        mysql -h 127.0.0.1 -P4000 -uroot
+        mysql -S #{var}/tidb.sock -uroot
         SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
         CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-root-password';
         GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
@@ -74,53 +85,20 @@ class TidbServer < Formula
     s
   end
 
-  plist_options :manual => "tidb-server --host 127.0.0.1 --store unistore --report-status=false --initialize-secure"
-
-  # launchd only honours UserName for system daemons, and there it is what keeps
-  # the job off root. An empty or root value defeats that, and the value is
-  # interpolated into XML, so validate and escape it.
-  def tidb_service_user
-    user = ENV["SUDO_USER"] || ENV["USER"]
-    if user.nil? || user.empty? || user == "root"
-      raise "refusing to run tidb-server as root; run `brew services` as your own account"
-    end
-
-    user.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
-  end
-
-  # TiDB defaults --host to 0.0.0.0 and always serves an unauthenticated
-  # status/pprof HTTP endpoint whose /settings and /reload-config handlers mutate
-  # configuration. Pin the database to loopback, switch the status service off,
-  # and bootstrap credentials securely. UserName keeps the job off root even if
-  # it is installed as a system daemon with `sudo`.
-  def plist
-    s = <<~EOS
-      <?xml version="1.0" encoding="UTF-8"?>
-      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-      <plist version="1.0">
-      <dict>
-        <key>KeepAlive</key>
-        <true/>
-        <key>Label</key>
-        <string>#{plist_name}</string>
-        <key>ProgramArguments</key>
-        <array>
-          <string>#{opt_bin}/tidb-server</string>
-          <string>--host</string>
-          <string>127.0.0.1</string>
-          <string>--store</string>
-          <string>unistore</string>
-          <string>--report-status=false</string>
-          <string>--initialize-secure</string>
-        </array>
-        <key>RunAtLoad</key>
-        <true/>
-        <key>UserName</key>
-        <string>#{tidb_service_user}</string>
-      </dict>
-      </plist>
-    EOS
-    s
+  # The service definition lives in Homebrew's supported DSL so the hardening is
+  # carried by the generated unit rather than by a deprecated hand-written plist.
+  # The socket is moved out of world-writable /tmp into the (user-owned) var
+  # directory, and stdout/stderr are recorded for auditing.
+  service do
+    run [opt_bin/"tidb-server", "--host", "127.0.0.1", "--store", "unistore",
+         "--socket", "#{var}/tidb.sock", "--report-status=false",
+         "--initialize-secure"]
+    keep_alive true
+    run_at_load true
+    require_root false
+    working_dir var
+    log_path var/"log/tidb-server.log"
+    error_log_path var/"log/tidb-server.err.log"
   end
 
   test do
@@ -128,11 +106,11 @@ class TidbServer < Formula
       dir = Dir.mktmpdir
 
       pid = fork do
-        # Bind to loopback, skip the status HTTP service, and bootstrap securely
-        # so `brew test` never publishes an unauthenticated server.
+        # Bind to loopback, keep the socket out of /tmp, skip the status HTTP
+        # service, and bootstrap securely.
         exec bin/"tidb-server", "--host", "127.0.0.1", "--store", "unistore",
-             "--report-status=false", "--initialize-secure", "-P", "3999",
-             "-path", dir
+             "--socket", "#{dir}/tidb.sock", "--report-status=false",
+             "--initialize-secure", "-P", "3999", "-path", dir
       end
 
       require "socket"
