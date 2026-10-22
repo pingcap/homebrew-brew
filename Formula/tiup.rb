@@ -1,10 +1,25 @@
 class Tiup < Formula
-  desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
+  desc "Component manager for testing and using TiDB locally"
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.11.1"
+      tag:      "v1.17.1",
+      revision: "63565582d33387d8a2999a86ed855bbf8fc17df9"
   license "Apache-2.0"
-  version "v1.11.1"
+  version "v1.17.1"
+
+  livecheck do
+    url :stable
+    strategy :git
+    regex(/^v?(\d+(?:\.\d+)+)$/i)
+  end
+
+  # Upstream pins gopkg.in/yaml.v3 to a personal fork (github.com/WizardWuuu/yaml,
+  # PR pingcap/tiup#2687) to pad float decimals. It is a pseudo-version recorded
+  # in go.sum, so a rewritten fork fails the build instead of silently changing
+  # code; deleting the fork breaks builds. Tracked upstream; not patched here.
+
+  # SHA-256 of the mirror's immutable, versioned TUF root manifest.
+  TUF_ROOT_SHA256 = "032201888f247db943a3ab5b84ecb5e6dbd1d77c6b9adc9657b01175cdb534bf".freeze
 
   depends_on "go" => :build
   # depends_on "curl" => :build
@@ -15,7 +30,7 @@ class Tiup < Formula
   # published by the mirror and verify its SHA-256 at build time instead.
   resource "tiup-root-json" do
     url "https://tiup-mirrors.pingcap.com/2.root.json"
-    sha256 "032201888f247db943a3ab5b84ecb5e6dbd1d77c6b9adc9657b01175cdb534bf"
+    sha256 TUF_ROOT_SHA256
   end
 
   def install
@@ -35,14 +50,17 @@ class Tiup < Formula
   def caveats
     s = <<~EOS
       Install TiUP successfully!  Please run:
-      (If you have a private mirror source, Please replace https://tiup-mirrors.pingcap.com/root.json to your private mirror source:)
 
       TiUP needs a TUF root manifest before it can use the mirror. This formula
-      installs a pinned, SHA-256 verified copy, so do not fetch a fresh one:
+      installs a pinned, SHA-256 verified copy; re-verify and install it with:
 
       ================================================================================================================
-      ! Must do:      mkdir -p ~/.tiup/bin && cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
+      ! Must do:      mkdir -p ~/.tiup/bin && echo "#{TUF_ROOT_SHA256}  #{opt_pkgshare}/root.json" | shasum -a 256 -c && cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
       ================================================================================================================
+
+      To use a private mirror, configure it with `tiup mirror set <url>` after the
+      root manifest is in place. Replacing this pinned root.json changes TiUP's
+      trust anchor and is not recommended.
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
@@ -50,25 +68,7 @@ class Tiup < Formula
     s
   end
 
-  def upgrade
-    o = <<~EOS
-
-      Update all installed components to the latest version
-      
-      ===============================================
-        Have a try:     tiup update --all
-      ===============================================
-
-      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
-
-    EOS
-    
-  end
-
-
   test do
-    # The installed folder is not in the path, so use the entire path to any
-    # executables being tested: `system "#{bin}/program", "do", "something"`.
     system "#{bin}/tiup" "-v"
   end
 end
