@@ -4,6 +4,13 @@ class TidbServer < Formula
   url "https://github.com/pingcap/tidb.git",
       :tag      => "v26.3.21",
       :revision => "4bf5d42345b96340f888e7ef87aa83741aaa1832"
+  license "Apache-2.0"
+
+  livecheck do
+    url :stable
+    strategy :git
+    regex(/^v?(\d+(?:\.\d+)+)$/i)
+  end
 
   depends_on "go" => :build
 
@@ -11,11 +18,15 @@ class TidbServer < Formula
     # Keep the data directory under Homebrew's var; the socket template stays in
     # /tmp so auth_socket logins keep working.
     inreplace "pkg/config/config.go" do |s|
-      s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb\"")
+      unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb\"")
+        raise "could not rewrite the default data path in pkg/config/config.go"
+      end
     end
     inreplace "cmd/tidb-server/main.go" do |s|
-      s.gsub!('storePath = fset.String(nmStorePath, "/tmp/tidb",',
-              "storePath = fset.String(nmStorePath, \"#{var}/tidb\",")
+      unless s.gsub!('storePath = fset.String(nmStorePath, "/tmp/tidb",',
+                     "storePath = fset.String(nmStorePath, \"#{var}/tidb\",")
+        raise "could not rewrite the default data path in cmd/tidb-server/main.go"
+      end
     end
 
     system "make", "server"
@@ -24,9 +35,8 @@ class TidbServer < Formula
 
   def caveats
     s = <<~EOS
-      This install of TiDB uses the built-in mocktikv/unistore engine instead of
-      TiKV, and is slower than a production install. Any benchmarks will be
-      unreliable.
+      This install of TiDB uses the built-in unistore engine instead of TiKV,
+      and is slower than a production install. Any benchmarks will be unreliable.
 
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
@@ -64,7 +74,7 @@ class TidbServer < Formula
     s
   end
 
-  plist_options :manual => "tidb-server --host 127.0.0.1 --report-status=false --initialize-secure"
+  plist_options :manual => "tidb-server --host 127.0.0.1 --store unistore --report-status=false --initialize-secure"
 
   # launchd only honours UserName for system daemons, and there it is what keeps
   # the job off root. An empty or root value defeats that, and the value is
@@ -98,6 +108,8 @@ class TidbServer < Formula
           <string>#{opt_bin}/tidb-server</string>
           <string>--host</string>
           <string>127.0.0.1</string>
+          <string>--store</string>
+          <string>unistore</string>
           <string>--report-status=false</string>
           <string>--initialize-secure</string>
         </array>
@@ -118,8 +130,9 @@ class TidbServer < Formula
       pid = fork do
         # Bind to loopback, skip the status HTTP service, and bootstrap securely
         # so `brew test` never publishes an unauthenticated server.
-        exec bin/"tidb-server", "--host", "127.0.0.1", "--report-status=false",
-             "--initialize-secure", "-P", "3999", "-path", dir
+        exec bin/"tidb-server", "--host", "127.0.0.1", "--store", "unistore",
+             "--report-status=false", "--initialize-secure", "-P", "3999",
+             "-path", dir
       end
 
       require "socket"

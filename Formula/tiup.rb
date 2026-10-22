@@ -1,11 +1,17 @@
 class Tiup < Formula
-  desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
+  desc "Component manager for testing and using TiDB locally"
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
       tag:      "v1.17.1",
       revision: "63565582d33387d8a2999a86ed855bbf8fc17df9"
   license "Apache-2.0"
   version "v1.17.1"
+
+  livecheck do
+    url :stable
+    strategy :git
+    regex(/^v?(\d+(?:\.\d+)+)$/i)
+  end
 
   # Upstream pins gopkg.in/yaml.v3 to a personal fork (github.com/WizardWuuu/yaml,
   # PR pingcap/tiup#2687) to pad float decimals. It is a pseudo-version recorded
@@ -62,25 +68,7 @@ class Tiup < Formula
     s
   end
 
-  def upgrade
-    o = <<~EOS
-
-      Update all installed components to the latest version
-      
-      ===============================================
-        Have a try:     tiup update --all
-      ===============================================
-
-      Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
-
-    EOS
-    
-  end
-
-
   test do
-    # The installed folder is not in the path, so use the entire path to any
-    # executables being tested: `system "#{bin}/program", "do", "something"`.
     system "#{bin}/tiup" "-v"
   end
 end
