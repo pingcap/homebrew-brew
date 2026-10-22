@@ -36,12 +36,23 @@ class Tiup < Formula
   def install
     # install
     system "make", "tiup"
-    # set tiup bin
-    bin_path = "bin/tiup"
-    bin.install bin_path
+    libexec.install "bin/tiup" => "tiup"
 
-    # Provide the hash-verified TUF root so no unverified first-run download is
-    # needed.
+    # Seed the pinned TUF root into TiUP's home on first use, so the trust
+    # anchor is never fetched over the network (trust-on-first-use).
+    (bin/"tiup").write <<~SH
+      #!/bin/sh
+      tiup_home="${TIUP_HOME:-$HOME/.tiup}"
+      root="$tiup_home/bin/root.json"
+      if [ ! -f "$root" ]; then
+        mkdir -p "$tiup_home/bin"
+        cp "#{opt_pkgshare}/root.json" "$root.tmp.$$"
+        mv "$root.tmp.$$" "$root"
+      fi
+      exec "#{opt_libexec}/tiup" "$@"
+    SH
+    chmod 0755, bin/"tiup"
+
     resource("tiup-root-json").stage do
       pkgshare.install "2.root.json" => "root.json"
     end
@@ -49,18 +60,14 @@ class Tiup < Formula
 
   def caveats
     s = <<~EOS
-      Install TiUP successfully!  Please run:
+      Install TiUP successfully!
 
-      TiUP needs a TUF root manifest before it can use the mirror. This formula
-      installs a pinned, SHA-256 verified copy; re-verify and install it with:
+      TiUP needs a TUF root manifest. The `tiup` command seeds the pinned,
+      SHA-256 verified copy into "${TIUP_HOME:-~/.tiup}/bin/root.json" on first
+      use, so no trust-on-first-use download is needed.
 
-      ================================================================================================================
-      ! Must do:      mkdir -p ~/.tiup/bin && echo "#{TUF_ROOT_SHA256}  #{opt_pkgshare}/root.json" | shasum -a 256 -c && cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
-      ================================================================================================================
-
-      To use a private mirror, configure it with `tiup mirror set <url>` after the
-      root manifest is in place. Replacing this pinned root.json changes TiUP's
-      trust anchor and is not recommended.
+      To use a private mirror, configure it with `tiup mirror set <url>`.
+      Replacing the pinned root.json changes TiUP's trust anchor.
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
@@ -69,6 +76,8 @@ class Tiup < Formula
   end
 
   test do
-    system "#{bin}/tiup" "-v"
+    ENV["TIUP_HOME"] = (testpath/"tiup-home").to_s
+    system bin/"tiup", "-v"
+    assert_predicate testpath/"tiup-home/bin/root.json", :exist?
   end
 end

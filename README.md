@@ -28,9 +28,10 @@ so root has no password and can only connect over that socket as the OS user tha
 started the server. There is no wildcard `root@'%'`, and the unauthenticated
 status HTTP service (`/metrics`, `/settings`, `/debug/pprof`) is disabled.
 
-An existing datastore is not re-bootstrapped; `brew install` warns when one is
-present, and `brew info tidb-server` has the SQL that removes an old wildcard
-root.
+An older datastore left at `$(brew --prefix)/var/tidb` is never opened: this
+version uses its own `var/tidb-26` directory, so the old accounts are not
+reachable. `brew install` warns when an old store is present, and
+`brew info tidb-server` has the SQL for migrating it deliberately.
 
 Give applications their own least-privileged account:
 
@@ -39,11 +40,12 @@ CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-password';
 GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
 ```
 
-Data lives in `$(brew --prefix)/var/tidb`; service output is recorded in
+Data lives in `$(brew --prefix)/var/tidb-26`; service output is recorded in
 `$(brew --prefix)/var/log/tidb-server.log`. `brew services start` registers the
 job at login; use `brew services run tidb-server` for a one-session start.
 
 ## tiup
 
-`brew info tiup` prints the one-time step that installs the pinned,
-SHA-256-verified TUF root manifest into `~/.tiup/bin`.
+The `tiup` command seeds the pinned, SHA-256-verified TUF root manifest into
+`${TIUP_HOME:-~/.tiup}/bin/root.json` on first use, so the trust anchor is never
+fetched over the network.
