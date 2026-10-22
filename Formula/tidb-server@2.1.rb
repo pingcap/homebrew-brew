@@ -59,6 +59,18 @@ class TidbServerAT21 < Formula
 
   plist_options :manual => "tidb-server --host 127.0.0.1 --report-status=false"
 
+  # launchd only honours UserName for system daemons, and there it is what keeps
+  # the job off root. An empty or root value defeats that, and the value is
+  # interpolated into XML, so validate and escape it.
+  def tidb_service_user
+    user = ENV["SUDO_USER"] || ENV["USER"]
+    if user.nil? || user.empty? || user == "root"
+      raise "refusing to run tidb-server as root; run `brew services` as your own account"
+    end
+
+    user.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+  end
+
   # TiDB defaults --host to 0.0.0.0, which would publish a passwordless,
   # all-privileged 'root' account to the local network. 2.1 also has no
   # --status-host flag, so its unauthenticated status/metrics/pprof HTTP service
@@ -85,7 +97,7 @@ class TidbServerAT21 < Formula
         <key>RunAtLoad</key>
         <true/>
         <key>UserName</key>
-        <string>#{ENV["SUDO_USER"] || ENV["USER"]}</string>
+        <string>#{tidb_service_user}</string>
       </dict>
       </plist>
     EOS
