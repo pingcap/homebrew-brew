@@ -2,10 +2,10 @@ class Tiup < Formula
   desc "TiDB is a MySQL compatible distributed database, and tiup is a component manager for testing and using TiDB locally."
   homepage "https://www.pingcap.com"
   url "https://github.com/pingcap/tiup.git",
-      tag:      "v1.11.1",
-      revision: "b95172df211e4f9b643590f2dd8436ad60c72b38"
+      tag:      "v1.17.1",
+      revision: "63565582d33387d8a2999a86ed855bbf8fc17df9"
   license "Apache-2.0"
-  version "v1.11.1"
+  version "v1.17.1"
 
   # SHA-256 of the mirror's immutable, versioned TUF root manifest.
   TUF_ROOT_SHA256 = "032201888f247db943a3ab5b84ecb5e6dbd1d77c6b9adc9657b01175cdb534bf".freeze
