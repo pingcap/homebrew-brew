@@ -2,8 +2,8 @@ class TidbServerAT21 < Formula
   desc "TiDB is a MySQL compatible distributed database"
   homepage "https://www.pingcap.com/en/"
   url "https://github.com/pingcap/tidb.git",
-      :tag      => "v2.1.13",
-      :revision => "6b5b1a6802f9b8f5a22d8aab24ac80729331e1bc"
+      :tag      => "v2.1.19",
+      :revision => "fcbcc4569fbd7aba9eb92092149f092346b934ec"
 
   depends_on "go" => :build
 
@@ -22,8 +22,9 @@ class TidbServerAT21 < Formula
 
   def caveats
     s = <<~EOS
-      This install of TiDB uses goleveldb as the storage engine instead of TiKV,
-      and is slower than a production install. Any benchmarks will be unreliable.
+      This install of TiDB uses the built-in mocktikv/unistore engine instead of
+      TiKV, and is slower than a production install. Any benchmarks will be
+      unreliable.
 
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
