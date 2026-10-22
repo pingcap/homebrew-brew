@@ -27,26 +27,32 @@ class TidbServerAT21 < Formula
 
       tidb-server does not bundle any clients. To use the MySQL client:
       brew install mysql-client
-      mysql -h 127.0.0.1 -P4000 -uroot
 
       Security notice:
-      The service binds the MySQL protocol listener to 127.0.0.1:4000 only.
+      `brew services start tidb-server` binds the MySQL protocol listener to
+      127.0.0.1:4000 and runs as you rather than as root. 2.1 has no
+      --status-host flag: its status/metrics HTTP service always listens on
+      every interface, so the service disables it with --report-status=false.
 
-      TiDB 2.1 has no --status-host flag: its status/metrics HTTP service always
-      listens on every interface (:10080), so this formula disables that service
-      with --report-status=false. TiDB also bootstraps a single all-privileged
-      account, 'root'@'%', with an empty password, so anyone with local access
-      to this machine can read and change any data as root. Set a root password
-      and give applications a least-privileged account:
+      TiDB still bootstraps a single all-privileged 'root'@'%' account with an
+      empty password and has no option to set one non-interactively, so anyone
+      with local access can log in as root, and brew services re-exposes it at
+      every login. Set a password and move root off the wildcard host now:
 
         mysql -h 127.0.0.1 -P4000 -uroot
         SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
+        CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-root-password';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
         CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-app-password';
         GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
+        DROP USER 'root'@'%';
 
-      Running `tidb-server` by hand without --host 127.0.0.1 makes it listen on
-      every interface. To reach TiDB from another machine, prefer an SSH tunnel
-      (ssh -L 4000:127.0.0.1:4000 this-host) over rebinding to 0.0.0.0.
+      The GRANT keeps 'root'@'127.0.0.1' administrative, so dropping the wildcard
+      account does not lock you out. To run TiDB by hand, use the same flags:
+      tidb-server --host 127.0.0.1 --report-status=false
+
+      To reach TiDB from another machine, prefer an SSH tunnel
+      (ssh -L 4000:127.0.0.1:4000 this-host) over binding to 0.0.0.0.
     EOS
     s
   end
@@ -57,7 +63,8 @@ class TidbServerAT21 < Formula
   # all-privileged 'root' account to the local network. 2.1 also has no
   # --status-host flag, so its unauthenticated status/metrics/pprof HTTP service
   # cannot be pinned to loopback and is disabled here instead of left on
-  # 0.0.0.0:10080.
+  # 0.0.0.0:10080. UserName keeps the job off root even if it is installed as a
+  # system daemon with `sudo`.
   def plist
     s = <<~EOS
       <?xml version="1.0" encoding="UTF-8"?>
@@ -77,6 +84,8 @@ class TidbServerAT21 < Formula
         </array>
         <key>RunAtLoad</key>
         <true/>
+        <key>UserName</key>
+        <string>#{ENV["SUDO_USER"] || ENV["USER"]}</string>
       </dict>
       </plist>
     EOS
