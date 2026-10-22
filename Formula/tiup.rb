@@ -7,6 +7,11 @@ class Tiup < Formula
   license "Apache-2.0"
   version "v1.17.1"
 
+  # Upstream pins gopkg.in/yaml.v3 to a personal fork (github.com/WizardWuuu/yaml,
+  # PR pingcap/tiup#2687) to pad float decimals. It is a pseudo-version recorded
+  # in go.sum, so a rewritten fork fails the build instead of silently changing
+  # code; deleting the fork breaks builds. Tracked upstream; not patched here.
+
   # SHA-256 of the mirror's immutable, versioned TUF root manifest.
   TUF_ROOT_SHA256 = "032201888f247db943a3ab5b84ecb5e6dbd1d77c6b9adc9657b01175cdb534bf".freeze
 
