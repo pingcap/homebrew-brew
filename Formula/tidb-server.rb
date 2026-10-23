@@ -74,22 +74,11 @@ class TidbServer < Formula
         mysql -S #{var}/tidb.sock -uroot
 
       Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an
-      older formula is never opened by this service. v3.0/v2.1 stores use a
-      different engine, so export them with the matching version. A v26 store
-      can be reopened deliberately on a separate, loopback-only port and socket:
-
-        tidb-server --host 127.0.0.1 --store unistore --path #{var}/tidb \
-          -P 4001 --socket #{var}/tidb-migrate.sock --report-status=false
-
-      Connect interactively (never put a password on a command line) and run,
-      replacing the placeholders with values you choose:
-
-        mysql -S #{var}/tidb-migrate.sock -uroot
-
-        SET PASSWORD FOR 'root'@'%' = '<root-password>';
-        CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY '<root-password>';
-        GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
-        DROP USER 'root'@'%';
+      older formula is never opened by this service. To keep that data, run the
+      matching TiDB version against it in an isolated environment, set a
+      password and a least-privileged account, then export and restore into this
+      instance. Do not expose the old store on a network while it still has its
+      default accounts.
 
       Give applications a least-privileged account, again typed interactively:
 
