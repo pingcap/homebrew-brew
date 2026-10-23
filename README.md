@@ -51,5 +51,5 @@ job at login; use `brew services run tidb-server` for a one-session start.
 
 The `tiup` command seeds the pinned, SHA-256-verified TUF root manifest into
 `${TIUP_HOME:-~/.tiup}/bin/root.json` on first use, so the trust anchor is never
-fetched over the network. It re-verifies that anchor on every run; for a private
-mirror, run `tiup mirror set <url>` and export `TIUP_ALLOW_CUSTOM_ROOT=1`.
+fetched over the network. It re-verifies that anchor on every run; a private
+mirror needs its own formula with the matching pinned hash.
