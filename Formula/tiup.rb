@@ -43,6 +43,7 @@ class Tiup < Formula
     # re-verified against the build-time hash before it is copied.
     (bin/"tiup").write <<~SH
       #!/bin/sh
+      set -eu
       PATH=/usr/bin:/bin
       export PATH
 
@@ -53,7 +54,16 @@ class Tiup < Formula
 
       hash_of() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
 
-      if [ -f "$root" ]; then
+      if [ -L "$root" ]; then
+        echo "tiup: refusing to run: $root is a symlink." >&2
+        exit 1
+      fi
+
+      if [ -e "$root" ]; then
+        if [ ! -f "$root" ]; then
+          echo "tiup: refusing to run: $root is not a regular file." >&2
+          exit 1
+        fi
         if [ "$(hash_of "$root")" != "$expected" ] && [ "${TIUP_ALLOW_CUSTOM_ROOT:-0}" != "1" ]; then
           echo "tiup: refusing to run: $root does not match the pinned TUF root." >&2
           echo "tiup: set TIUP_ALLOW_CUSTOM_ROOT=1 if you intentionally use a private mirror." >&2
@@ -67,6 +77,10 @@ class Tiup < Formula
         mkdir -p "$tiup_home/bin"
         cp "$src" "$root.tmp.$$"
         mv "$root.tmp.$$" "$root"
+        if [ ! -f "$root" ] || [ "$(hash_of "$root")" != "$expected" ]; then
+          echo "tiup: refusing to run: failed to install the pinned TUF root." >&2
+          exit 1
+        fi
       fi
 
       exec "#{opt_libexec}/tiup" "$@"
