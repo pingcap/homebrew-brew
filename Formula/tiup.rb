@@ -39,14 +39,21 @@ class Tiup < Formula
     libexec.install "bin/tiup" => "tiup"
 
     # Seed the pinned TUF root into TiUP's home on first use, so the trust
-    # anchor is never fetched over the network (trust-on-first-use).
+    # anchor is never fetched over the network (trust-on-first-use). The seed is
+    # re-verified against the build-time hash before it is copied.
     (bin/"tiup").write <<~SH
       #!/bin/sh
       tiup_home="${TIUP_HOME:-$HOME/.tiup}"
       root="$tiup_home/bin/root.json"
       if [ ! -f "$root" ]; then
+        src="#{opt_pkgshare}/root.json"
+        actual=$(shasum -a 256 "$src" | awk '{print $1}')
+        if [ "$actual" != "#{TUF_ROOT_SHA256}" ]; then
+          echo "tiup: refusing to seed root.json: checksum mismatch in $src" >&2
+          exit 1
+        fi
         mkdir -p "$tiup_home/bin"
-        cp "#{opt_pkgshare}/root.json" "$root.tmp.$$"
+        cp "$src" "$root.tmp.$$"
         mv "$root.tmp.$$" "$root"
       fi
       exec "#{opt_libexec}/tiup" "$@"

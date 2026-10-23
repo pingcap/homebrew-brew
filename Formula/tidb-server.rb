@@ -15,20 +15,31 @@ class TidbServer < Formula
   depends_on "go" => :build
 
   def install
-    # Keep data and the default socket under Homebrew's var; the socket default
-    # matters for manual runs that do not pass --socket.
+    # Make the compiled-in defaults safe too, not just the service flags: data
+    # and the default socket move under Homebrew's var, listeners default to
+    # loopback, the status HTTP service is off, and bootstrap is secure.
     inreplace "pkg/config/config.go" do |s|
       unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb-26\"") &&
-             s.gsub!('"/tmp/tidb-{Port}.sock"', "\"#{var}/tidb.sock\"")
-        raise "could not rewrite the default data or socket path in pkg/config/config.go"
+             s.gsub!('"/tmp/tidb-{Port}.sock"', "\"#{var}/tidb.sock\"") &&
+             s.gsub!('DefHost = "0.0.0.0"', 'DefHost = "127.0.0.1"') &&
+             s.gsub!('DefStatusHost = "0.0.0.0"', 'DefStatusHost = "127.0.0.1"') &&
+             s.gsub!(/ReportStatus:\s+true/, "ReportStatus: false") &&
+             s.gsub!("Security: Security{", "Security: Security{\n\t\tSecureBootstrap: true,")
+        raise "could not harden the default config in pkg/config/config.go"
       end
     end
     inreplace "cmd/tidb-server/main.go" do |s|
       unless s.gsub!('storePath = fset.String(nmStorePath, "/tmp/tidb",',
                      "storePath = fset.String(nmStorePath, \"#{var}/tidb-26\",") &&
              s.gsub!('socket = fset.String(nmSocket, "/tmp/tidb-{Port}.sock"',
-                     "socket = fset.String(nmSocket, \"#{var}/tidb.sock\"")
-        raise "could not rewrite the default data or socket path in cmd/tidb-server/main.go"
+                     "socket = fset.String(nmSocket, \"#{var}/tidb.sock\"") &&
+             s.gsub!('host = fset.String(nmHost, "0.0.0.0",',
+                     'host = fset.String(nmHost, "127.0.0.1",') &&
+             s.gsub!('statusHost = fset.String(nmStatusHost, "0.0.0.0",',
+                     'statusHost = fset.String(nmStatusHost, "127.0.0.1",') &&
+             s.gsub!('reportStatus = flagBoolean(fset, nmReportStatus, true,',
+                     'reportStatus = flagBoolean(fset, nmReportStatus, false,')
+        raise "could not harden the default flags in cmd/tidb-server/main.go"
       end
     end
 
