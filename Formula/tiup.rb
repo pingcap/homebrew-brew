@@ -43,12 +43,24 @@ class Tiup < Formula
     # re-verified against the build-time hash before it is copied.
     (bin/"tiup").write <<~SH
       #!/bin/sh
+      PATH=/usr/bin:/bin
+      export PATH
+
       tiup_home="${TIUP_HOME:-$HOME/.tiup}"
       root="$tiup_home/bin/root.json"
-      if [ ! -f "$root" ]; then
-        src="#{opt_pkgshare}/root.json"
-        actual=$(shasum -a 256 "$src" | awk '{print $1}')
-        if [ "$actual" != "#{TUF_ROOT_SHA256}" ]; then
+      expected="#{TUF_ROOT_SHA256}"
+      src="#{opt_pkgshare}/root.json"
+
+      hash_of() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
+
+      if [ -f "$root" ]; then
+        if [ "$(hash_of "$root")" != "$expected" ] && [ "${TIUP_ALLOW_CUSTOM_ROOT:-0}" != "1" ]; then
+          echo "tiup: refusing to run: $root does not match the pinned TUF root." >&2
+          echo "tiup: set TIUP_ALLOW_CUSTOM_ROOT=1 if you intentionally use a private mirror." >&2
+          exit 1
+        fi
+      else
+        if [ ! -f "$src" ] || [ "$(hash_of "$src")" != "$expected" ]; then
           echo "tiup: refusing to seed root.json: checksum mismatch in $src" >&2
           exit 1
         fi
@@ -56,6 +68,7 @@ class Tiup < Formula
         cp "$src" "$root.tmp.$$"
         mv "$root.tmp.$$" "$root"
       fi
+
       exec "#{opt_libexec}/tiup" "$@"
     SH
     chmod 0755, bin/"tiup"
@@ -73,8 +86,8 @@ class Tiup < Formula
       SHA-256 verified copy into "${TIUP_HOME:-~/.tiup}/bin/root.json" on first
       use, so no trust-on-first-use download is needed.
 
-      To use a private mirror, configure it with `tiup mirror set <url>`.
-      Replacing the pinned root.json changes TiUP's trust anchor.
+      To use a private mirror, configure it with `tiup mirror set <url>` and
+      export TIUP_ALLOW_CUSTOM_ROOT=1 so the shim accepts the custom anchor.
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
