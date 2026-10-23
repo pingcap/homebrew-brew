@@ -73,22 +73,31 @@ class TidbServer < Formula
 
         mysql -S #{var}/tidb.sock -uroot
 
-      Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an older
-      formula is never opened by this service, so its accounts are not
-      reachable. To migrate that store deliberately, start tidb-server with
-      --path #{var}/tidb and drop its wildcard root (the GRANT keeps the
-      replacement administrative):
+      Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an
+      older formula is never opened by this service. v3.0/v2.1 stores use a
+      different engine, so export them with the matching version. A v26 store
+      can be reopened deliberately on a separate port and socket, and hardened
+      with a password the shell prompts for (avoid single quotes):
 
-        mysql -S #{var}/tidb.sock -uroot
-        SET PASSWORD FOR 'root'@'%' = 'choose-a-strong-root-password';
-        CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-root-password';
-        GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
-        DROP USER 'root'@'%';
+        tidb-server --store unistore --path #{var}/tidb -P 4001 \
+          --socket #{var}/tidb-migrate.sock --report-status=false
 
-      Give applications a least-privileged account in either case:
+        read -rsp "new root password: " TIDB_PW && echo
+        mysql -S #{var}/tidb-migrate.sock -uroot -e "
+          SET PASSWORD FOR 'root'@'%' = '${TIDB_PW}';
+          CREATE USER 'root'@'127.0.0.1' IDENTIFIED BY '${TIDB_PW}';
+          GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
+          DROP USER 'root'@'%';
+        "
 
-        CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY 'choose-a-strong-app-password';
-        GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
+      Give applications a least-privileged account, again with a prompted
+      password:
+
+        read -rsp "new app password: " APP_PW && echo
+        mysql -S #{var}/tidb.sock -uroot -e "
+          CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY '${APP_PW}';
+          GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
+        "
 
       To reach TiDB from another machine, prefer an SSH tunnel
       (ssh -L 4000:127.0.0.1:4000 this-host) over binding to 0.0.0.0.
