@@ -34,68 +34,13 @@ class Tiup < Formula
   end
 
   def install
-    # install
     system "make", "tiup"
-    libexec.install "bin/tiup" => "tiup"
+    bin.install "bin/tiup"
 
-    # Seed the pinned TUF root into TiUP's home on first use, so the trust
-    # anchor is never fetched over the network (trust-on-first-use). The seed is
-    # re-verified against the build-time hash before it is copied.
-    (bin/"tiup").write <<~SH
-      #!/bin/sh
-      set -eu
-      PATH=/usr/bin:/bin
-      export PATH
-
-      tiup_home="${TIUP_HOME:-$HOME/.tiup}"
-      case "$tiup_home" in
-        /*) ;;
-        *) echo "tiup: TIUP_HOME must be an absolute path." >&2; exit 1 ;;
-      esac
-      case "/$tiup_home/" in
-        */../*) echo "tiup: TIUP_HOME must not contain '..'." >&2; exit 1 ;;
-      esac
-
-      expected="#{TUF_ROOT_SHA256}"
-      src="#{opt_pkgshare}/root.json"
-
-      hash_of() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
-
-      mkdir -p "$tiup_home/bin"
-      tiup_home=$(cd -P "$tiup_home" && pwd -P)
-      root="$tiup_home/bin/root.json"
-
-      if [ -L "$root" ]; then
-        echo "tiup: refusing to run: $root is a symlink." >&2
-        exit 1
-      fi
-
-      if [ -e "$root" ]; then
-        if [ ! -f "$root" ]; then
-          echo "tiup: refusing to run: $root is not a regular file." >&2
-          exit 1
-        fi
-        if [ "$(hash_of "$root")" != "$expected" ]; then
-          echo "tiup: refusing to run: $root does not match the pinned TUF root." >&2
-          exit 1
-        fi
-      else
-        if [ ! -f "$src" ] || [ "$(hash_of "$src")" != "$expected" ]; then
-          echo "tiup: refusing to seed root.json: checksum mismatch in $src" >&2
-          exit 1
-        fi
-        cp "$src" "$root.tmp.$$"
-        mv "$root.tmp.$$" "$root"
-        if [ ! -f "$root" ] || [ "$(hash_of "$root")" != "$expected" ]; then
-          echo "tiup: refusing to run: failed to install the pinned TUF root." >&2
-          exit 1
-        fi
-      fi
-
-      exec "#{opt_libexec}/tiup" "$@"
-    SH
-    chmod 0755, bin/"tiup"
-
+    # Ship the build-verified trust anchor. The operator copies it into TiUP's
+    # home once: a formula cannot write there itself because post_install runs
+    # sandboxed, and a shell wrapper around the binary would be bypassable
+    # (libexec, `tiup update --self`) and racy.
     resource("tiup-root-json").stage do
       pkgshare.install "2.root.json" => "root.json"
     end
@@ -105,13 +50,16 @@ class Tiup < Formula
     s = <<~EOS
       Install TiUP successfully!
 
-      TiUP needs a TUF root manifest. The `tiup` command seeds the pinned,
-      SHA-256 verified copy into "${TIUP_HOME:-~/.tiup}/bin/root.json" on first
-      use, so no trust-on-first-use download is needed.
+      TiUP needs a TUF root manifest before it can talk to the mirror, and the
+      first network fetch would be trusted on first use. This formula ships the
+      pinned copy; install it once, verifying it again before the copy:
+
+        mkdir -p ~/.tiup/bin
+        echo "#{TUF_ROOT_SHA256}  #{opt_pkgshare}/root.json" | shasum -a 256 -c
+        cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
 
       This formula pins the official mirror's TUF root. A private mirror has a
-      different root, so it needs its own formula with the matching pinned hash;
-      the shim refuses to run against a mismatched anchor.
+      different root and needs its own formula with the matching pinned hash.
 
       Questions? https://docs.pingcap.com/tidb/stable/tiup-component-management
 
@@ -120,8 +68,6 @@ class Tiup < Formula
   end
 
   test do
-    ENV["TIUP_HOME"] = (testpath/"tiup-home").to_s
-    system bin/"tiup", "-v"
-    assert_predicate testpath/"tiup-home/bin/root.json", :exist?
+    system "#{bin}/tiup" "-v"
   end
 end
