@@ -48,12 +48,29 @@ class TidbServer < Formula
   end
 
   def post_install
-    return unless (var/"tidb").exist?
+    if (var/"tidb").exist?
+      opoo <<~EOS
+        A datastore from an older formula was found at #{var}/tidb. This version
+        uses #{var}/tidb-26 and never opens the old store, so its accounts are
+        not reachable; see `brew info tidb-server` if you want to migrate it.
+      EOS
+    end
+
+    store = var/"tidb-26"
+    return unless store.exist?
+
+    begin
+      stat = File.stat(store)
+      unexpected = stat.uid != Process.uid || (stat.mode & 0o022) != 0
+    rescue SystemCallError
+      unexpected = true
+    end
+    return unless unexpected
 
     opoo <<~EOS
-      A datastore from an older formula was found at #{var}/tidb. This version
-      uses #{var}/tidb-26 and never opens the old store, so its accounts are not
-      reachable; see `brew info tidb-server` if you want to migrate it.
+      #{store} already exists but is owned by another user, or is group/world
+      writable. Its accounts were not created by this formula; verify or remove
+      it before starting the service.
     EOS
   end
 
