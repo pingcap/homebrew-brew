@@ -49,7 +49,7 @@ job at login; use `brew services run tidb-server` for a one-session start.
 
 ## tiup
 
-The pinned TUF root manifest is shipped in the formula at
-`share/tiup/root.json`; `brew info tiup` prints the one-time command that
-verifies it against the pinned SHA-256 and copies it into `~/.tiup/bin`. A
-private mirror needs its own formula with the matching pinned hash.
+The formula compiles `$(brew --prefix)/var/tiup` in as TiUP's home and installs
+the pinned, build-verified TUF root at `var/tiup/bin/root.json`, so the trust
+anchor is never fetched over the network. Setting `TIUP_HOME` overrides that and
+must provide its own anchor.

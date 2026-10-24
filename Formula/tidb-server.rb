@@ -69,9 +69,9 @@ class TidbServer < Formula
 
     opoo <<~EOS
       #{store} already exists but is owned by another user, or is group/world
-      writable. Its accounts were not created by this formula; verify or remove
-      it before starting the service.
+      writable. Its accounts were not created by this formula.
     EOS
+    raise "refusing to complete the install with an unverified datastore at #{store}"
   end
 
   def caveats

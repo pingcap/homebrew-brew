@@ -34,15 +34,16 @@ class Tiup < Formula
   end
 
   def install
-    system "make", "tiup"
+    # Compile var/tiup in as the default TiUP home, so the trust anchor below is
+    # exactly what TiUP reads: no wrapper, no home-directory write, no
+    # trust-on-first-use download.
+    system "make", "tiup",
+           "EXTRA_LDFLAGS=-X github.com/pingcap/tiup/pkg/localdata.DefaultTiUPHome=#{var}/tiup"
     bin.install "bin/tiup"
 
-    # Ship the build-verified trust anchor. The operator copies it into TiUP's
-    # home once: a formula cannot write there itself because post_install runs
-    # sandboxed, and a shell wrapper around the binary would be bypassable
-    # (libexec, `tiup update --self`) and racy.
+    # Written at build time from the SHA-256 pinned resource above.
     resource("tiup-root-json").stage do
-      pkgshare.install "2.root.json" => "root.json"
+      (var/"tiup/bin").install "2.root.json" => "root.json"
     end
   end
 
@@ -50,13 +51,10 @@ class Tiup < Formula
     s = <<~EOS
       Install TiUP successfully!
 
-      TiUP needs a TUF root manifest before it can talk to the mirror, and the
-      first network fetch would be trusted on first use. This formula ships the
-      pinned copy; install it once, verifying it again before the copy:
-
-        mkdir -p ~/.tiup/bin
-        echo "#{TUF_ROOT_SHA256}  #{opt_pkgshare}/root.json" | shasum -a 256 -c
-        cp #{opt_pkgshare}/root.json ~/.tiup/bin/root.json
+      This build of tiup uses #{var}/tiup as its home, and the pinned,
+      build-verified TUF root is installed at #{var}/tiup/bin/root.json, so the
+      anchor is never fetched over the network. Setting TIUP_HOME overrides that
+      default and must provide its own trust root.
 
       This formula pins the official mirror's TUF root. A private mirror has a
       different root and needs its own formula with the matching pinned hash.
@@ -68,6 +66,7 @@ class Tiup < Formula
   end
 
   test do
+    assert_predicate var/"tiup/bin/root.json", :exist?
     system "#{bin}/tiup" "-v"
   end
 end
