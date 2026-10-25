@@ -1,3 +1,5 @@
+require "digest"
+
 class Tiup < Formula
   desc "Component manager for testing and using TiDB locally"
   homepage "https://www.pingcap.com"
@@ -41,26 +43,80 @@ class Tiup < Formula
            "EXTRA_LDFLAGS=-X github.com/pingcap/tiup/pkg/localdata.DefaultTiUPHome=#{var}/tiup"
     bin.install "bin/tiup"
 
-    # Private home: other local users must not be able to plant or replace the
-    # anchor or the components. Symlinks and foreign owners are rejected.
-    home = var/"tiup"
+    bindir = tiup_private_dir(tiup_private_dir(var/"tiup")/"bin")
+
+    # Never write through a pre-existing link: replace the link itself.
+    anchor = bindir/"root.json"
     begin
-      stat = File.lstat(home)
-      unless stat.directory? && stat.uid == Process.uid
-        raise "#{home} is not a directory owned by the current user"
+      stat = File.lstat(anchor)
+      if stat.symlink?
+        anchor.unlink
+      elsif !stat.file? || stat.uid != Process.uid
+        raise "#{anchor} is not a regular file owned by the current user"
       end
     rescue Errno::ENOENT
-      home.mkpath
+      nil
     end
-    (home/"bin").mkpath
-    home.chmod(0o700)
-    (home/"bin").chmod(0o700)
 
     # Written at build time from the SHA-256 pinned resource above.
     resource("tiup-root-json").stage do
-      (home/"bin").install "2.root.json" => "root.json"
+      bindir.install "2.root.json" => "root.json"
     end
-    (home/"bin/root.json").chmod(0o600)
+
+    stat = File.lstat(anchor)
+    unless stat.file? && stat.uid == Process.uid
+      raise "#{anchor} is not a regular file owned by the current user"
+    end
+
+    anchor.chmod(0o600)
+    tiup_verify_anchor(anchor)
+  end
+
+  def post_install
+    bindir = var/"tiup/bin"
+    anchor = bindir/"root.json"
+
+    [var/"tiup", bindir].each do |dir|
+      stat = File.lstat(dir)
+      unless stat.directory? && stat.uid == Process.uid && (stat.mode & 0o077).zero?
+        raise "#{dir} is not a private directory owned by the current user"
+      end
+    end
+
+    stat = File.lstat(anchor)
+    unless stat.file? && stat.uid == Process.uid && (stat.mode & 0o077).zero?
+      raise "#{anchor} is not a private regular file owned by the current user"
+    end
+
+    tiup_verify_anchor(anchor)
+  end
+
+  # Create (or adopt) a directory only the current user can use. Symlinks and
+  # foreign owners are rejected and the resulting mode is verified, not assumed.
+  def tiup_private_dir(path)
+    begin
+      stat = File.lstat(path)
+      unless stat.directory? && stat.uid == Process.uid
+        raise "#{path} is not a directory owned by the current user"
+      end
+    rescue Errno::ENOENT
+      path.mkpath
+    end
+
+    path.chmod(0o700)
+    unless (File.lstat(path).mode & 0o777) == 0o700
+      raise "#{path} could not be restricted to 0700"
+    end
+
+    path
+  end
+
+  # The anchor TiUP reads must be byte-for-byte the pinned, build-verified one.
+  def tiup_verify_anchor(path)
+    actual = Digest::SHA256.file(path).hexdigest
+    return if actual == TUF_ROOT_SHA256
+
+    raise "#{path} does not match the pinned TUF root (got #{actual})"
   end
 
   def caveats
@@ -82,7 +138,9 @@ class Tiup < Formula
   end
 
   test do
-    assert_predicate var/"tiup/bin/root.json", :exist?
+    anchor = var/"tiup/bin/root.json"
+    assert_predicate anchor, :exist?
+    assert_equal TUF_ROOT_SHA256, Digest::SHA256.file(anchor).hexdigest
     system "#{bin}/tiup" "-v"
   end
 end
