@@ -20,7 +20,7 @@ class TidbServer < Formula
     # loopback, the status HTTP service is off, and bootstrap is secure.
     inreplace "pkg/config/config.go" do |s|
       unless s.gsub!(/Path:\s+"\/tmp\/tidb"/, "Path: \"#{var}/tidb-26\"") &&
-             s.gsub!('"/tmp/tidb-{Port}.sock"', "\"#{var}/tidb.sock\"") &&
+             s.gsub!('"/tmp/tidb-{Port}.sock"', "\"#{var}/tidb-run/tidb.sock\"") &&
              s.gsub!('DefHost = "0.0.0.0"', 'DefHost = "127.0.0.1"') &&
              s.gsub!('DefStatusHost = "0.0.0.0"', 'DefStatusHost = "127.0.0.1"') &&
              s.gsub!(/ReportStatus:\s+true/, "ReportStatus: false") &&
@@ -32,7 +32,7 @@ class TidbServer < Formula
       unless s.gsub!('storePath = fset.String(nmStorePath, "/tmp/tidb",',
                      "storePath = fset.String(nmStorePath, \"#{var}/tidb-26\",") &&
              s.gsub!('socket = fset.String(nmSocket, "/tmp/tidb-{Port}.sock"',
-                     "socket = fset.String(nmSocket, \"#{var}/tidb.sock\"") &&
+                     "socket = fset.String(nmSocket, \"#{var}/tidb-run/tidb.sock\"") &&
              s.gsub!('host = fset.String(nmHost, "0.0.0.0",',
                      'host = fset.String(nmHost, "127.0.0.1",') &&
              s.gsub!('statusHost = fset.String(nmStatusHost, "0.0.0.0",',
@@ -45,6 +45,22 @@ class TidbServer < Formula
 
     system "make", "server"
     bin.install "bin/tidb-server"
+
+    # Private runtime dirs: another local user must not be able to pre-create the
+    # socket path or a datastore this service would adopt. Symlinks and foreign
+    # owners are rejected rather than followed.
+    [var/"tidb-run", var/"tidb-26"].each do |dir|
+      begin
+        stat = File.lstat(dir)
+        unless stat.directory? && stat.uid == Process.uid
+          raise "#{dir} is not a directory owned by the current user"
+        end
+      rescue Errno::ENOENT
+        dir.mkpath
+      end
+
+      dir.chmod(0o700)
+    end
   end
 
   def post_install
@@ -56,22 +72,23 @@ class TidbServer < Formula
       EOS
     end
 
-    store = var/"tidb-26"
-    return unless store.exist?
+    [var/"tidb-26", var/"tidb-run"].each do |path|
+      next unless path.exist? || path.symlink?
 
-    begin
-      stat = File.stat(store)
-      unexpected = stat.uid != Process.uid || (stat.mode & 0o022) != 0
-    rescue SystemCallError
-      unexpected = true
+      begin
+        stat = File.lstat(path)
+        unexpected = !stat.directory? || stat.uid != Process.uid || (stat.mode & 0o077) != 0
+      rescue SystemCallError
+        unexpected = true
+      end
+      next unless unexpected
+
+      opoo <<~EOS
+        #{path} is not a private directory owned by the current user. Its
+        contents were not created by this formula.
+      EOS
+      raise "refusing to complete the install with an unverified path at #{path}"
     end
-    return unless unexpected
-
-    opoo <<~EOS
-      #{store} already exists but is owned by another user, or is group/world
-      writable. Its accounts were not created by this formula.
-    EOS
-    raise "refusing to complete the install with an unverified datastore at #{store}"
   end
 
   def caveats
@@ -88,7 +105,7 @@ class TidbServer < Formula
       below, and only for the OS user that started the server. There is no
       wildcard root, and the unauthenticated status HTTP service is disabled.
 
-        mysql -S #{var}/tidb.sock -uroot
+        mysql -S #{var}/tidb-run/tidb.sock -uroot
 
       Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an
       older formula is never opened by this service. To keep that data, run the
@@ -99,7 +116,7 @@ class TidbServer < Formula
 
       Give applications a least-privileged account, again typed interactively:
 
-        mysql -S #{var}/tidb.sock -uroot
+        mysql -S #{var}/tidb-run/tidb.sock -uroot
 
         CREATE USER 'app'@'127.0.0.1' IDENTIFIED BY '<app-password>';
         GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
@@ -115,11 +132,11 @@ class TidbServer < Formula
 
   # The service definition lives in Homebrew's supported DSL so the hardening is
   # carried by the generated unit rather than by a deprecated hand-written plist.
-  # The socket is moved out of world-writable /tmp into the (user-owned) var
-  # directory, and stdout/stderr are recorded for auditing.
+  # The socket lives in a 0700 directory under var, and stdout/stderr are
+  # recorded for auditing.
   service do
     run [opt_bin/"tidb-server", "--host", "127.0.0.1", "--store", "unistore",
-         "--socket", "#{var}/tidb.sock", "--report-status=false",
+         "--socket", "#{var}/tidb-run/tidb.sock", "--report-status=false",
          "--initialize-secure"]
     keep_alive true
     run_at_load true

@@ -41,10 +41,26 @@ class Tiup < Formula
            "EXTRA_LDFLAGS=-X github.com/pingcap/tiup/pkg/localdata.DefaultTiUPHome=#{var}/tiup"
     bin.install "bin/tiup"
 
+    # Private home: other local users must not be able to plant or replace the
+    # anchor or the components. Symlinks and foreign owners are rejected.
+    home = var/"tiup"
+    begin
+      stat = File.lstat(home)
+      unless stat.directory? && stat.uid == Process.uid
+        raise "#{home} is not a directory owned by the current user"
+      end
+    rescue Errno::ENOENT
+      home.mkpath
+    end
+    (home/"bin").mkpath
+    home.chmod(0o700)
+    (home/"bin").chmod(0o700)
+
     # Written at build time from the SHA-256 pinned resource above.
     resource("tiup-root-json").stage do
-      (var/"tiup/bin").install "2.root.json" => "root.json"
+      (home/"bin").install "2.root.json" => "root.json"
     end
+    (home/"bin/root.json").chmod(0o600)
   end
 
   def caveats
