@@ -15,12 +15,13 @@ brew install tiup
 TiDB v26.3.21, single node on the built-in `unistore` engine (no TiKV or PD
 required).
 
-The service runs on loopback, with the socket under Homebrew's var directory
-rather than world-writable `/tmp`, and starts with `--initialize-secure`:
+The service runs on loopback, with the socket in a private (0700) directory under
+Homebrew's var rather than world-writable `/tmp`, and starts with
+`--initialize-secure`:
 
 ```sh
 brew services start tidb-server
-mysql -S "$(brew --prefix)/var/tidb.sock" -uroot
+mysql -S "$(brew --prefix)/var/tidb-run/tidb.sock" -uroot
 ```
 
 A fresh datastore bootstraps `'root'@'localhost'` with the `auth_socket` plugin,
@@ -34,7 +35,7 @@ reachable. `brew install` warns when an old store is present, and
 `brew info tidb-server` has the SQL for migrating it deliberately.
 
 Give applications their own least-privileged account. Connect with
-`mysql -S "$(brew --prefix)/var/tidb.sock" -uroot` and type the SQL at the
+`mysql -S "$(brew --prefix)/var/tidb-run/tidb.sock" -uroot` and type the SQL at the
 prompt, replacing the placeholder with a password you choose (never put it on a
 command line, where `ps` can see it):
 
@@ -49,7 +50,7 @@ job at login; use `brew services run tidb-server` for a one-session start.
 
 ## tiup
 
-The formula compiles `$(brew --prefix)/var/tiup` in as TiUP's home and installs
-the pinned, build-verified TUF root at `var/tiup/bin/root.json`, so the trust
-anchor is never fetched over the network. Setting `TIUP_HOME` overrides that and
-must provide its own anchor.
+The formula compiles `$(brew --prefix)/var/tiup` in as TiUP's home (created
+0700, owned by the installing user) and installs the pinned, build-verified TUF
+root at `var/tiup/bin/root.json`, so the trust anchor is never fetched over the
+network. Setting `TIUP_HOME` overrides that and must provide its own anchor.
