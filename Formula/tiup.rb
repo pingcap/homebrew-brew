@@ -36,6 +36,14 @@ class Tiup < Formula
   end
 
   def install
+    # Ignore TIUP_HOME: the environment must not redirect TiUP to a home with no
+    # verified anchor, which would fall back to trust-on-first-use.
+    inreplace "pkg/localdata/profile.go" do |s|
+      unless s.gsub!(/^[ \t]*case os\.Getenv\(EnvNameHome\) != "":[ \t]*\n[ \t]*profileDir = os\.Getenv\(EnvNameHome\)[ \t]*\n/, "")
+        raise "could not pin the TiUP home against TIUP_HOME"
+      end
+    end
+
     # Compile var/tiup in as the default TiUP home, so the trust anchor below is
     # exactly what TiUP reads: no wrapper, no home-directory write, no
     # trust-on-first-use download.
@@ -125,8 +133,8 @@ class Tiup < Formula
 
       This build of tiup uses #{var}/tiup as its home, and the pinned,
       build-verified TUF root is installed at #{var}/tiup/bin/root.json, so the
-      anchor is never fetched over the network. Setting TIUP_HOME overrides that
-      default and must provide its own trust root.
+      anchor is never fetched over the network. TIUP_HOME is ignored by this
+      build so the environment cannot redirect TiUP to an unanchored home.
 
       This formula pins the official mirror's TUF root. A private mirror has a
       different root and needs its own formula with the matching pinned hash.

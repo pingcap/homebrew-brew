@@ -53,4 +53,5 @@ job at login; use `brew services run tidb-server` for a one-session start.
 The formula compiles `$(brew --prefix)/var/tiup` in as TiUP's home (created
 0700, owned by the installing user) and installs the pinned, build-verified TUF
 root at `var/tiup/bin/root.json`, so the trust anchor is never fetched over the
-network. Setting `TIUP_HOME` overrides that and must provide its own anchor.
+network. `TIUP_HOME` is ignored by this build, so the environment cannot
+redirect TiUP to an unanchored home.
