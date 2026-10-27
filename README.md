@@ -45,7 +45,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON yourdb.* TO 'app'@'127.0.0.1';
 ```
 
 Data lives in `$(brew --prefix)/var/tidb-26`; service output is recorded in
-`$(brew --prefix)/var/log/tidb-server.log`. `brew services start` registers the
+`$(brew --prefix)/var/tidb-run/tidb-server.log`. `brew services start` registers the
 job at login; use `brew services run tidb-server` for a one-session start.
 
 ## tiup

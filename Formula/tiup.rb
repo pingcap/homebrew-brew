@@ -44,14 +44,21 @@ class Tiup < Formula
       end
     end
 
-    # Compile var/tiup in as the default TiUP home, so the trust anchor below is
+    # The -X value is an absolute path interpolated into ldflags: reject anything
+    # that could break out of it (spaces, quotes, shell metacharacters).
+    home = var/"tiup"
+    unless home.to_s.match?(/\A[0-9A-Za-z._\/-]+\z/)
+      raise "unsafe TiUP home path for -X: #{home}"
+    end
+
+    # Compile the home in as the default TiUP home, so the trust anchor below is
     # exactly what TiUP reads: no wrapper, no home-directory write, no
     # trust-on-first-use download.
     system "make", "tiup",
-           "EXTRA_LDFLAGS=-X github.com/pingcap/tiup/pkg/localdata.DefaultTiUPHome=#{var}/tiup"
+           "EXTRA_LDFLAGS=-X github.com/pingcap/tiup/pkg/localdata.DefaultTiUPHome=#{home}"
     bin.install "bin/tiup"
 
-    bindir = tiup_private_dir(tiup_private_dir(var/"tiup")/"bin")
+    bindir = tiup_private_dir(tiup_private_dir(home)/"bin")
 
     # Never write through a pre-existing link: replace the link itself.
     anchor = bindir/"root.json"

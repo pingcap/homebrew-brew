@@ -132,8 +132,8 @@ class TidbServer < Formula
 
   # The service definition lives in Homebrew's supported DSL so the hardening is
   # carried by the generated unit rather than by a deprecated hand-written plist.
-  # The socket lives in a 0700 directory under var, and stdout/stderr are
-  # recorded for auditing.
+  # The socket, working directory and stdout/stderr all live in the 0700
+  # var/tidb-run directory.
   service do
     run [opt_bin/"tidb-server", "--host", "127.0.0.1", "--store", "unistore",
          "--socket", "#{var}/tidb-run/tidb.sock", "--report-status=false",
@@ -141,9 +141,9 @@ class TidbServer < Formula
     keep_alive true
     run_at_load true
     require_root false
-    working_dir var
-    log_path var/"log/tidb-server.log"
-    error_log_path var/"log/tidb-server.err.log"
+    working_dir var/"tidb-run"
+    log_path var/"tidb-run/tidb-server.log"
+    error_log_path var/"tidb-run/tidb-server.err.log"
   end
 
   test do
