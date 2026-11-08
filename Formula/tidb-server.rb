@@ -64,15 +64,34 @@ class TidbServer < Formula
 
     # Provenance: a store that already holds data but was not created here is
     # refused instead of being served without ever running the secure bootstrap.
+    # The marker is inspected and replaced with lstat/unlink/O_EXCL, so a planted
+    # symlink is removed itself and can never be followed for a write or chmod.
     store = var/"tidb-26"
     marker = store/".homebrew-secure-bootstrap"
     foreign = store.children.any? { |child| child.basename.to_s != marker.basename.to_s }
-    if foreign && !marker.exist?
-      raise "refusing to adopt an unverified datastore at #{store}: move it aside or migrate it deliberately"
+    begin
+      stat = File.lstat(marker)
+      if stat.symlink?
+        # An empty store may still carry a stale link: remove the link itself,
+        # never its target. A store with data must not accept a forged link as
+        # provenance, so that case is refused.
+        raise "refusing a symlinked provenance marker at #{marker}" if foreign
+      elsif !stat.file? || stat.uid != Process.uid
+        raise "refusing a non-regular or foreign provenance marker at #{marker}"
+      end
+
+      File.unlink(marker)
+    rescue Errno::ENOENT
+      if foreign
+        raise "refusing to adopt an unverified datastore at #{store}: move it aside or migrate it deliberately"
+      end
     end
 
-    marker.write("") unless marker.exist?
-    marker.chmod(0o600)
+    # O_CREAT|O_EXCL refuses to follow or replace an entry that appeared after
+    # the check; fchmod sets the mode on the descriptor, not on a path.
+    File.open(marker, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+      file.chmod(0o600)
+    end
   end
 
   def post_install
