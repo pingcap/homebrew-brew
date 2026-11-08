@@ -24,10 +24,12 @@ brew services start tidb-server
 mysql -S "$(brew --prefix)/var/tidb-run/tidb.sock" -uroot
 ```
 
-A fresh datastore bootstraps `'root'@'localhost'` with the `auth_socket` plugin,
-so root has no password and can only connect over that socket as the OS user that
-started the server. There is no wildcard `root@'%'`, and the unauthenticated
-status HTTP service (`/metrics`, `/settings`, `/debug/pprof`) is disabled.
+A datastore created by this formula bootstraps `'root'@'localhost'` with the
+`auth_socket` plugin, so root has no password and can only connect over that
+socket as the OS user that started the server. It has no wildcard `root@'%'`, and
+the unauthenticated status HTTP service (`/metrics`, `/settings`, `/debug/pprof`)
+is disabled. The install refuses a `var/tidb-26` that already holds data without
+the formula's provenance marker.
 
 An older datastore left at `$(brew --prefix)/var/tidb` is never opened: this
 version uses its own `var/tidb-26` directory, so the old accounts are not

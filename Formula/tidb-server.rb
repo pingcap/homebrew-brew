@@ -61,6 +61,18 @@ class TidbServer < Formula
 
       dir.chmod(0o700)
     end
+
+    # Provenance: a store that already holds data but was not created here is
+    # refused instead of being served without ever running the secure bootstrap.
+    store = var/"tidb-26"
+    marker = store/".homebrew-secure-bootstrap"
+    foreign = store.children.any? { |child| child.basename.to_s != marker.basename.to_s }
+    if foreign && !marker.exist?
+      raise "refusing to adopt an unverified datastore at #{store}: move it aside or migrate it deliberately"
+    end
+
+    marker.write("") unless marker.exist?
+    marker.chmod(0o600)
   end
 
   def post_install
@@ -89,6 +101,18 @@ class TidbServer < Formula
       EOS
       raise "refusing to complete the install with an unverified path at #{path}"
     end
+
+    marker = var/"tidb-26/.homebrew-secure-bootstrap"
+    begin
+      stat = File.lstat(marker)
+      unexpected = !stat.file? || stat.uid != Process.uid || (stat.mode & 0o077) != 0
+    rescue SystemCallError
+      unexpected = true
+    end
+    return unless unexpected
+
+    opoo "provenance marker missing or unsafe at #{marker}"
+    raise "refusing to complete the install without the provenance marker at #{marker}"
   end
 
   def caveats
@@ -100,12 +124,17 @@ class TidbServer < Formula
       brew install mysql-client
 
       Security notice:
-      A fresh datastore is bootstrapped securely: 'root'@'localhost' uses the
-      auth_socket plugin, so it has no password, only works over the Unix socket
-      below, and only for the OS user that started the server. There is no
-      wildcard root, and the unauthenticated status HTTP service is disabled.
+      A datastore created by this formula is bootstrapped securely:
+      'root'@'localhost' uses the auth_socket plugin, so it has no password, only
+      works over the Unix socket below, and only for the OS user that started
+      the server. It has no wildcard root, and the unauthenticated status HTTP
+      service is disabled.
 
         mysql -S #{var}/tidb-run/tidb.sock -uroot
+
+      The install refuses a var/tidb-26 that already holds data but does not
+      carry this formula's provenance marker, so a legacy store cannot simply be
+      renamed into place and served without the secure bootstrap.
 
       Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an
       older formula is never opened by this service. To keep that data, run the
