@@ -62,35 +62,52 @@ class TidbServer < Formula
       dir.chmod(0o700)
     end
 
-    # Provenance: a store that already holds data but was not created here is
-    # refused instead of being served without ever running the secure bootstrap.
-    # The marker is inspected and replaced with lstat/unlink/O_EXCL, so a planted
-    # symlink is removed itself and can never be followed for a write or chmod.
+    # Provenance: a hard link inside the store points at a record kept in the
+    # 0700 tidb-run directory. A legacy store renamed into place has no such
+    # link, and another local user cannot create one (the record is 0600 in a
+    # 0700 directory), so it is refused. Reinstalls keep the same link.
     store = var/"tidb-26"
-    marker = store/".homebrew-secure-bootstrap"
-    foreign = store.children.any? { |child| child.basename.to_s != marker.basename.to_s }
-    begin
-      stat = File.lstat(marker)
-      if stat.symlink?
-        # An empty store may still carry a stale link: remove the link itself,
-        # never its target. A store with data must not accept a forged link as
-        # provenance, so that case is refused.
-        raise "refusing a symlinked provenance marker at #{marker}" if foreign
-      elsif !stat.file? || stat.uid != Process.uid
-        raise "refusing a non-regular or foreign provenance marker at #{marker}"
-      end
-
-      File.unlink(marker)
-    rescue Errno::ENOENT
-      if foreign
-        raise "refusing to adopt an unverified datastore at #{store}: move it aside or migrate it deliberately"
-      end
+    record = var/"tidb-run/provenance"
+    link = store/".provenance"
+    store_stat = File.lstat(store)
+    unless store_stat.directory? && store_stat.uid == Process.uid && (store_stat.mode & 0o077).zero?
+      raise "#{store} is not a private directory owned by the current user"
     end
 
-    # O_CREAT|O_EXCL refuses to follow or replace an entry that appeared after
-    # the check; fchmod sets the mode on the descriptor, not on a path.
-    File.open(marker, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
-      file.chmod(0o600)
+    data = (Dir.children(store) - [".provenance", ".homebrew-secure-bootstrap"]).any?
+    after = File.lstat(store)
+    unless after.dev == store_stat.dev && after.ino == store_stat.ino
+      raise "#{store} changed while its provenance was being checked"
+    end
+
+    if data
+      begin
+        ls = File.lstat(link)
+        rs = File.lstat(record)
+      rescue Errno::ENOENT
+        raise "refusing to adopt an unverified datastore at #{store}: " \
+              "move it aside (e.g. mv #{store} #{store}.legacy) or migrate it deliberately"
+      end
+      unless ls.file? && rs.file? && rs.uid == Process.uid && (rs.mode & 0o077).zero? &&
+             ls.dev == rs.dev && ls.ino == rs.ino
+        raise "refusing to adopt #{store}: it is not linked to this install's provenance record"
+      end
+    else
+      begin
+        File.unlink(link)
+      rescue Errno::ENOENT
+        nil
+      end
+      begin
+        File.unlink(record)
+      rescue Errno::ENOENT
+        nil
+      end
+      File.open(record, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+        file.write("#{store.basename}\n")
+        file.chmod(0o600)
+      end
+      File.link(record, link)
     end
   end
 
@@ -121,17 +138,21 @@ class TidbServer < Formula
       raise "refusing to complete the install with an unverified path at #{path}"
     end
 
-    marker = var/"tidb-26/.homebrew-secure-bootstrap"
+    store = var/"tidb-26"
+    record = var/"tidb-run/provenance"
+    link = store/".provenance"
     begin
-      stat = File.lstat(marker)
-      unexpected = !stat.file? || stat.uid != Process.uid || (stat.mode & 0o077) != 0
+      ls = File.lstat(link)
+      rs = File.lstat(record)
+      valid = ls.file? && rs.file? && rs.uid == Process.uid && (rs.mode & 0o077).zero? &&
+              ls.dev == rs.dev && ls.ino == rs.ino
     rescue SystemCallError
-      unexpected = true
+      valid = false
     end
-    return unless unexpected
+    return if valid
 
-    opoo "provenance marker missing or unsafe at #{marker}"
-    raise "refusing to complete the install without the provenance marker at #{marker}"
+    opoo "provenance record for #{store} is missing or not linked"
+    raise "refusing to complete the install without a linked provenance record"
   end
 
   def caveats
@@ -151,9 +172,12 @@ class TidbServer < Formula
 
         mysql -S #{var}/tidb-run/tidb.sock -uroot
 
-      The install refuses a var/tidb-26 that already holds data but does not
-      carry this formula's provenance marker, so a legacy store cannot simply be
-      renamed into place and served without the secure bootstrap.
+      The install refuses a var/tidb-26 that already holds data unless it
+      contains a hard link to the 0700 var/tidb-run/provenance record, so a
+      legacy store cannot simply be renamed into place and served without the
+      secure bootstrap. A store created by an earlier revision of this formula
+      predates that link; move it aside once (mv #{var}/tidb-26
+      #{var}/tidb-26.legacy) and let this install bootstrap a new one.
 
       Data lives in #{var}/tidb-26. A datastore left at #{var}/tidb by an
       older formula is never opened by this service. To keep that data, run the
