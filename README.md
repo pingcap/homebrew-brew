@@ -28,8 +28,8 @@ A datastore created by this formula bootstraps `'root'@'localhost'` with the
 `auth_socket` plugin, so root has no password and can only connect over that
 socket as the OS user that started the server. It has no wildcard `root@'%'`, and
 the unauthenticated status HTTP service (`/metrics`, `/settings`, `/debug/pprof`)
-is disabled. The install refuses a `var/tidb-26` that already holds data without
-the formula's provenance marker.
+is disabled. The install refuses a `var/tidb-26` that already holds data unless
+it contains a hard link to the `var/tidb-run/provenance` record.
 
 An older datastore left at `$(brew --prefix)/var/tidb` is never opened: this
 version uses its own `var/tidb-26` directory, so the old accounts are not
